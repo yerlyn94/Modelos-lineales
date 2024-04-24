@@ -1,0 +1,511 @@
+---
+title: 'Tarea Regresión Lineal- Modelos Lineales y de Sobrevivencia'
+author: " Rachell Casanova B81697 \\ Liz Madriz B84555 \\ Yerlyn Quiros  B45528"
+date: "2024-04-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#-Se cargan las librerias a utilizar
+library(psych)
+library(GGally)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(lmtest)
+library(corrplot)
+library(car)
+library(psych)
+```
+
+# **Parte 1**
+
+**a.) Replique en un Script de R, los Ejemplos 1 y 2, usando todas las funciones que se presenta el artículo.**
+
+La replica de los ejemplos 1 y 2, fueron tomados de: [ejemplos](https://rpubs.com/Joaquin_AR/226291 "ejemplos"), tanto código como parte su explicación.
+
+# **Ejemplo 1: Predictores numéricos.**
+
+En este ejemplo se busca generar un modelo que permita predecir la esperanza de vida media de los habitantes de una ciudad en función a law eiwtintas variables como: abitantes, analfabetismo, ingresos, esperanza de vida, asesinatos, universitarios, heladas, área y densidad poblacional.
+
+```{r}
+# Se utiliza el dataframe llamda state.x77, en el cual se modifica el nombre sus variables y se renombra como ejemplo1
+ejemplo1 <- as.data.frame(state.x77)
+ejemplo1 <- rename(habitantes = Population, analfabetismo = Illiteracy,
+                ingresos = Income, esp_vida = `Life Exp`, asesinatos = Murder,
+                universitarios = `HS Grad`, heladas = Frost, area = Area,
+                .data = ejemplo1)
+ejemplo1 <- mutate(.data = ejemplo1, densidad_pobl = habitantes * 1000 / area)
+```
+
+Para realizar el propósito de este ejmplo se realizará una serie de pasos.
+
+**Paso 1. Análisis de relación entre variables:**
+
+Esta es la etápa que permite identificar los mejores predictores para el modelo, identificar que qué variables presentan relaciones de tipo no lineal (por lo que no pueden ser incluidas) y para identificar colinialidad entre predictores.
+
+```{r}
+#Se calcula la matriz de correlación de Pearson entre todas las variables del conjunto de datos.
+round(cor(x = ejemplo1, method = "pearson"), 3)
+```
+
+```{r}
+#Se visualizan histogramas múltiples para cada variable del conjunto de datos.
+multi.hist(x = ejemplo1, dcol = c("blue", "red"), dlty = c("dotted", "solid"), main = "")
+
+```
+
+```{r}
+#Pares de gráficos
+ggpairs(ejemplo1, lower = list(continuous = "smooth"),
+        diag = list(continuous = "barDiag"), axisLabels = "none")
+```
+
+A partir de lo realizado anteriormente, se observa que:
+
+-   Las variables que tienen una mayor relación lineal con la esperanza de vida son: asesinatos (r= -0.78), analfabetismo (r= -0.59) y universitarios (r= 0.58).
+
+-   Variables como asesinatos y analfabetismo están medianamente correlacionados (r = 0.7) por lo que posiblemente no sea útil introducir ambos predictores en el modelo.
+
+-   Las variables habitantes, área y densidad poblacional muestran una distribución exponencial, una transformación logarítmica posiblemente haría más normal su distribución.
+
+**Paso 2. Generar el modelo:**
+
+Existen diferentes formar de generar el modelo más adecuado. En esta ocasión, se empleará el método mixto, de modo que se incie el modelo con todas las variables como predictores y realizando la selección de los mejores predictores con la medición Akaike (AIC)
+
+```{r}
+#Modelo inicial: Se ajusta un modelo de regresión lineal múltiple utilizando todas las variables como predictores.
+modelo1 <- lm(esp_vida ~ habitantes + ingresos + analfabetismo + asesinatos +  universitarios + heladas + area + densidad_pobl, data = ejemplo1 )
+summary(modelo1)
+```
+
+A partir de lo anterior, se afirma que el modelo con todas las variables introducidas como predictores tiene un R2 alta (0.7501), capac de explicar el 75,01% de la variabilidad observada en la esperanza de vida. Además, el p-valor del modelo tiene un valor significativo (3.787e-10), por lo que se puede aceptar que el modelo no es por azar, al menos uno de los coeficientes parciales de regresión es disntinto de 0. Se observa que muchos de ellos no son significativos, lo que es un indivativo de podrían no contribuir al modelo.
+
+**Paso 3. Selección de los mejores predictores:**
+
+En esta ocasión, este paso fue realizado con la estrategia de stepwise mixto. El valor matemático empleado para determinar la calidad del modelo va a ser el AIC.
+
+```{r}
+#Se realiza la selección de variables mediante el método stepwise mixto utilizando el criterio AIC.
+step(object = modelo1, direction = "both", trace = 1)
+```
+
+Se ha obtenido que el mejor modelo resultanbte del proceso de selección ha sido:
+
+```{r}
+#Modelo final utilizando las variables seleccionadas.
+modelo1 <- (lm(formula = esp_vida ~ habitantes + asesinatos + universitarios +
+              heladas, data = ejemplo1))
+summary(modelo1)
+```
+
+Se muestra el intervalo de confianza para cada uno de los coeficientes parciales de regresión:
+
+```{r}
+# Se calcula el intervalo de confianza para cada coeficiente de regresión.
+confint(lm(formula = esp_vida ~ habitantes + asesinatos + universitarios +
+            heladas, data = ejemplo1))
+```
+
+A partir de lo anterior, se puede observar que cada coeficiente parciaL de regresión de los predictores (pendientes de un modelo de regresión lineal múltiple) se definen del siguiente modo:se define del siguiente modo: Si el resto de variables se mantienen constantes, por cada unidad que aumenta el predictor en cuestión, la variable (Y) varía en promedio tantas unidades como indica la pendiente. En este caso, se tiene que por cada unidad que aumenta el predictor universitarios, la esperanza de vida aumenta en promedio 0.04658 unidades, manteniéndose constantes el resto de predictores.
+
+**Paso 4. Validación de condiciones para la regresión múltiple lineal:**
+
+Se toma la relación lineal entre los predictores numéricos y la variable respuesta: esta condición se peude validar medinate diagramas de dispersión entre la variable dependiente y cada uno de los predictores (como se ha hecho en el análisis preliminar) o con diagramas de dispersión entre cada uno de los predictores y los residuos del modelo. Si la relación es lineal, los residuos deben de distribuirse aleatoriamente en torno a 0 con una variabilidad constante a lo largo del eje X. Esta última opción suele ser más indicada ya que permite identificar posibles datos atípicos.
+
+```{r}
+#Se realiza un gráfico de dispersión para evaluar la linealidad entre cada predictor y los residuos del modelo.
+plot1 <- ggplot(data = ejemplo1, aes(habitantes, modelo1$residuals)) +
+    geom_point() + geom_smooth(color = "firebrick") + geom_hline(yintercept = 0) +
+    theme_bw()
+plot2 <- ggplot(data = ejemplo1, aes(asesinatos, modelo1$residuals)) +
+    geom_point() + geom_smooth(color = "firebrick") + geom_hline(yintercept = 0) +
+    theme_bw()
+plot3 <- ggplot(data = ejemplo1, aes(universitarios, modelo1$residuals)) +
+    geom_point() + geom_smooth(color = "firebrick") + geom_hline(yintercept = 0) +
+    theme_bw()
+plot4 <- ggplot(data = ejemplo1, aes(heladas, modelo1$residuals)) +
+    geom_point() + geom_smooth(color = "firebrick") + geom_hline(yintercept = 0) +
+    theme_bw()
+grid.arrange(plot1, plot2, plot3, plot4)
+```
+
+De lo anterior, se afirma que se cumple la linealdiad para todos los predictores.
+
+Distribucción normal de los residuos:
+
+```{r}
+#Se realiza un gráfico Q-Q para evaluar la normalidad de los residuos.
+qqnorm(modelo1$residuals)
+qqline(modelo1$residuals)
+```
+
+```{r}
+# Se realiza el test de Shapiro-Wilk para evaluar la normalidad de los residuos.
+shapiro.test(modelo1$residuals)
+```
+
+Se tiene que tanto por el test de hipótesis como en análisis del gráfico, confirman la normalidad.
+
+Luego, se indica lo siguiente:
+
+Variabilidad constante de los residuos (homocedasticidad):
+
+Al representar los residuos frente a los valores ajustados por el modelo, los primeros se tienen que distribuir de forma aleatoria en torno a cero, manteniendo aproximadamente la misma variabilidad a lo largo del eje X. Si se observa algún patrón específico, por ejemplo forma cónica o mayor dispersión en los extremos, significa que la variabilidad es dependiente del valor ajustado y por lo tanto no hay homocedasticidad.
+
+```{r}
+# Se realiza un gráfico de dispersión para evaluar la homocedasticidad de los residuos.
+ggplot(data = ejemplo1, aes(modelo1$fitted.values, modelo1$residuals)) +
+geom_point() +
+geom_smooth(color = "firebrick", se = FALSE) +
+geom_hline(yintercept = 0) +
+theme_bw()
+
+```
+
+```{r}
+# Se realiza el test de Breusch-Pagan para evaluar la hom
+bptest(modelo1)
+```
+
+Se tevidencia que no hay evidencia de falta de homocedasticidad.
+
+No multicolinalidad: Matriz de correlación entre predictores.
+
+```{r}
+## Se muestra la matriz de correlación entre un subconjunto de predictores seleccionados.
+corrplot(cor(dplyr::select(ejemplo1, habitantes, asesinatos,universitarios,heladas)),
+         method = "number", tl.col = "black")
+```
+
+Análisis de Inflación de Varianza (VIF):
+
+```{r}
+# Se realiza el cálculo de los VIF (Factor de Inflación de la Varianza) para detectar multicolinealidad.
+vif(modelo1)
+```
+
+No hay predictores que muestren una correlación lineal muy alta ni inflación de varianza.
+
+Autocorrelación:
+
+```{r}
+# Se realiza el test de Durbin-Watson para evaluar la autocorrelación de los residuos.
+dwt(modelo1, alternative = "two.sided")
+```
+
+A partir de lo anterior, no hay evidencia de autoccorelación.
+
+Tamaño de la muestra:
+
+No existe una condición establecida para el número mínimo de observaciones, pero para prevenir que una variable resulte muy influyente cuando realmente no lo es, se recomienda que la cantidad de observaciones sea entre 10 y 20 veces el número de predictores. En este caso debería haber como mínimo 40 observaciones y se dispone de 50 por lo que es apropiado.
+
+**Paso 5. Identificación deposibles valores atípicos o influyentes:**
+
+```{r}
+# Se realiza una gráfica y un test para evaluar la presencia de posibles valores atípicos o influyentes.
+ejemplo1$studentized_residual <- rstudent(modelo1)
+ggplot(data = ejemplo1, aes(x = predict(modelo1), y = abs(studentized_residual))) +
+geom_hline(yintercept = 3, color = "grey", linetype = "dashed") +
+# se identifican en rojo observaciones con residuos estandarizados absolutos > 3
+geom_point(aes(color = ifelse(abs(studentized_residual) > 3, 'red', 'black'))) +
+scale_color_identity() +
+labs(title = "Distribución de los residuos studentized",
+     x = "predicción modelo") + 
+theme_bw() + theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Se identifican las observaciones con residuos estandarizados absolutos mayores que 3.
+which(abs(ejemplo1$studentized_residual) > 3)
+```
+
+No se identifican ninguna observación atípica.
+
+```{r}
+# Se muestra un resumen de las medidas de influencia para cada observación.
+summary(influence.measures(modelo1))
+```
+
+En la tabla generada se recogen las observaciones que son significativamente influyentes en al menos uno de los predictores (una columna para cada predictor). Las tres últimas columnas son 3 medidas distintas para cuantificar la influencia. A modo de guía se pueden considerar excesivamente influyentes aquellas observaciones para las que:
+
+Leverages (hat): Se consideran observaciones influyentes aquellas cuyos valores hat superen 2.5((p+1)/n) , siendo p el número de predictores y n el número de observaciones. Distancia Cook (cook.d): Se consideran influyentes valores superiores a 1.
+
+La visualización gráfica de las influencias se obtiene del siguiente modo:
+
+```{r}
+# Se genera un gráfico de influencia para visualizar las observaciones influyentes en el modelo.
+influencePlot(modelo1)
+```
+
+Los análisis muestran varias observaciones influyentes (posición 5 y 11) que exceden los límites de preocupación para los valores de Leverages o Distancia Cook. Estudios más exhaustivos consistirían en rehacer el modelo sin las observaciones y ver el impacto.
+
+**Paso 6. Conclusión:**
+
+El modelo lineal múltiple, dado por:
+
+Esperanza de vida= 5.014e−05habitantes−3.001e−01asesinatos+4.658e−02universitarios−5.943e−03heladas
+
+Es capaz de explicar el 73.6% de la variabilidad observada en la esperanza de vida. El test F muestra que es significativo (*p-value*: 1.696e-12). Se satisfacen todas las condiciones para este tipo de regresión múltiple. Dos observaciones (posición 5 y 11) podrían estar influyendo de forma notable en el modelo.
+
+# **Ejemplo 2: Predictores numéricos y categóricos.**
+
+En este ejemplo, lo que se desea es generar un modelo lineal múltiple que permita predecir el peso de un libro en función de su volumen y del tipo de tapas.
+
+```{r}
+#Se crea un dataframe llamado ejemplo2 con las variables peso, volumen y tipo_tapas.
+ejemplo2 <- data.frame(peso = c(800, 950, 1050, 350, 750, 600, 1075, 250, 700,
+                             650, 975, 350, 950, 425, 725),
+                    volumen = c(885, 1016, 1125, 239, 701, 641, 1228, 412, 953,
+                                929, 1492, 419, 1010, 595, 1034),
+                    tipo_tapas = c("duras", "duras", "duras", "duras", "duras", 
+                                   "duras", "duras", "blandas", "blandas",
+                                   "blandas", "blandas", "blandas", "blandas",
+                                   "blandas", "blandas"))
+head(ejemplo2, 4)
+```
+
+**Paso 1. Análisis de correlación para cada par de variables cuantitativas y diferencias del valor promedio entre las categóricas:**
+
+Cada par de variables cuantitativas se enfrentan mediante un diagrama de dispersión múltiple para intuir si existe relación lineal o monotónica con la variable respuesta. Si no la hay, no es adecuado emplear un modelo de regresión lineal. Además, se estudia la relación entre variables para detectar posible colinialidad. Para las variables de tipo categórico se genera un *boxplot* con sus niveles para intuir su influencia en la variable dependiente.
+
+```{r}
+# Se convierte la variable tipo_tapas en un factor.
+ejemplo2$tipo_tapas <- as.factor(ejemplo2$tipo_tapas)
+# Se genera un diagrama de dispersión múltiple para cada par de variables en el dataframe.
+pairs(x = ejemplo2)
+```
+
+```{r}
+# Se realiza un test de correlación de Pearson entre las variables peso y volumen.
+cor.test(ejemplo2$peso, ejemplo2$volumen, method = "pearson")
+```
+
+```{r}
+# Se crea un gráfico de cajas y bigotes para visualizar la relación entre el tipo de tapas y el peso de los libros.
+ggplot(data = ejemplo2, mapping=aes(x = tipo_tapas, y = peso, color=tipo_tapas)) +
+geom_boxplot() +
+geom_jitter(width = 0.1) +
+theme_bw() + theme(legend.position = "none")
+```
+
+Analizando el gráfico y de correlación, se observa una relación lineal significativa entre la variable peso y volumen. Luego, la variable tipo_tapas parece influir de forma significativa en el peso. Ambas variables pueden ser buenos predictores en un modelo lineal múltiple para la variable dependiente peso.
+
+**Paso 2. Generar el modelo lineal múltiple.**
+
+```{r}
+# Se ajusta un modelo de regresión lineal múltiple utilizando el peso como variable dependiente y el volumen y el tipo de tapas como variables independientes.
+modelo2 <- lm(peso ~ volumen + tipo_tapas, data = ejemplo2)
+# Se muestra un resumen del modelo generado.
+summary(modelo2)
+```
+
+```{r}
+# Se muestran los intervalos de confianza para los coeficientes de regresión del modelo.
+confint(modelo2)
+```
+
+A partirt de lo anterior y lo descrito en el ejemplo 1 de las pendientes de un modelo de regresión lineal múltiple, se tiene lo siguiente: En el caso del predictor volume, si el resto de variables no varían, por cada unidad de volumen que aumenta el libro el peso se incrementa en promedio 0.71795 unidades.
+
+Cabe tener en cuenta que, cuando un predictor es cualitativo, uno de sus niveles se considera de referencia (el que no aparece en la tabla de resultados) y se le asigna el valor de 0. El valor de la pendiente de cada nivel de un predictor cualitativo se define como el promedio de unidades que dicho nivel está por encima o debajo del nivel de referencia. Para el predictor tipo_tapas, el nivel de referencia es tapas blandas por lo que si el libro tiene este tipo de tapas se le da a la variable el valor 0 y si es de tapas duras el valor 1. Acorde al modelo generado, los libros de tapa dura son en promedio 184.04727 unidades de peso superiores a los de tapa blanda.
+
+*Peso libro =13.91557+0.71795 volumen+184.04727 tipotapas*
+
+El modelo es capaz de explicar el 92.75% de la variabilidad observada en el peso de los libros (R-squared: 0.9275). El valor de R2-ajustado es muy alto y cercano al R2 (Adjusted R-squared: 0.9154) lo que indica que el modelo contiene predictores útiles. El test F muestra un p-value de 1.455e-07 por lo que el modelo en conjunto es significativo. Esto se corrobora con el p-value de cada predictor, en ambos casos significativo.
+
+**Paso 3. Elección de los predictores:**
+
+En este caso, al solo haber dos predictores, a partir del summary del modelo se identifica que ambas variables incluidas son importantes.
+
+**Paso 4: Condicones para la regresión múltiple lineal:**
+
+```{r}
+# Se crea un gráfico de dispersión de los residuos del modelo en función del volumen.
+ggplot(data = ejemplo2, aes(x = volumen, y = modelo2$residuals)) +
+geom_point() +
+geom_smooth(color = "firebrick") +
+geom_hline(yintercept = 0) +
+theme_bw()
+```
+
+Se observa que se satisface la condición de linealidad. También se observa un posible dato atípico.
+
+2.  Distribucción normal de los residuos:
+
+```{r}
+qqnorm(modelo2$residuals)
+qqline(modelo2$residuals)
+```
+
+```{r}
+# Se realiza un test de normalidad de Shapiro-Wilk para los residuos del modelo.
+shapiro.test(modelo2$residuals)
+```
+
+A partir de lo anterior, se observa que la condición de normalidad no se satisface, posiblemente debido a un dato atípico. Se repite el análisis excluyendo la observación a la que pertenece el residuo atípico.
+
+```{r}
+# Se identifica la observación con el residuo máximo.
+which.max(modelo2$residuals)
+```
+
+```{r}
+# Se realiza un test de normalidad de Shapiro-Wilk para los residuos del modelo excluyendo la observación identificada como atípica.
+shapiro.test(modelo2$residuals[-13])
+```
+
+A partir de lo anterior, se puede confirmar que los residuos sí se distribuyen de forma normal a exepción de un dato extremo. Es necesario estudiar en detalle la influencia de esta observación para determinar si el modelo es más preciso sin ella.
+
+3.Variabilidad constante de los residuos:
+
+```{r}
+# Se crea un gráfico de dispersión de los residuos del modelo en función de los valores ajustados.
+ggplot(data = data.frame(predict_values = predict(modelo2),
+                         residuos = residuals(modelo2)),
+       aes(x = predict_values, y = residuos)) +
+    geom_point() +
+    geom_smooth(color = "firebrick", se = FALSE) +
+    geom_hline(yintercept = 0) +
+    theme_bw()
+```
+
+```{r}
+# Se realiza un test de Breusch-Pagan para evaluar la homocedasticidad de los residuos.
+bptest(modelo2)
+```
+
+De lo anterior no hay evidencias que indiquen falta de homocedasticidad.
+
+4.  No multicolinalidad:
+
+Como solo hay un predictor cuantitativo no se puede dar colinialidad.
+
+5.  Autocorrelación:
+
+```{r}
+# Se realiza un test de Durbin-Watson para detectar la presencia de autocorrelación en los residuos del modelo.
+dwt(modelo2,alternative = "two.sided")
+```
+
+De lo anterior no hay evidencia de autocorrelación.
+
+6.  Tamaño de la muestra:
+
+Cabe destacar que no existe una condición establecidad para el número mínimo de observaciones pero, para prevenir que una variable resulte muy influyente cuando realmente no lo es, se recomienda que la cantidad de observaciones sea entre 10 y 20 veces el número de predictores. En este caso debería haber como mínimo 20 observaciones y se dispone de 15 por lo que se debería considerar incrementar la muestra.
+
+**Paso 5. Identificación de posibles valores atípicos o influyentes:**
+
+```{r}
+# Se realiza un test de valores atípicos para identificar observaciones influyentes en el modelo.
+outlierTest(modelo2)
+```
+
+Tal como se apreció en el estudio de normalidad de los residuos, la observación 13 tiene un residuo estandarizado \>3 (más de 3 veces la desviación estándar de los residuos) por lo que se considera un dato atípico. El siguiente paso es determinar si es influyente.
+
+```{r}
+# Se muestra un resumen de las medidas de influencia para cada observación del modelo.
+summary(influence.measures(modelo2))
+```
+
+```{r}
+# Se muestra un resumen de las medidas de influencia para cada observación del modelo.
+influencePlot(modelo2)
+```
+
+El análisis muestran varias observaciones influyentes aunque ninguna excede los límites de preocupación para los valores de Leverages hat (\>2.5(2+1)/15=0.5) o Distancia Cook (\>1). Estudios más exhaustivos consistirían en rehacer el modelo sin las observaciones y ver el impacto.
+
+**Paso 6. Conclusión:** El modelo lineal múltiple dado por:
+
+*Peso libro=13.91557+0.71795 volumen+184.04727 tipotapas*
+
+es capaz de explicar el 92.75% de la variabilidad observada en el peso de los libros (R-squared: 0.9275, Adjusted R-squared: 0.9154). El test F muestra que es significativo (1.455e-07). Se satisfacen todas las condiciones para este tipo de regresión.
+
+**b.) Explique brevemente las siguientes funciones, incluyendo valores recibe y cuáles son sus salidas.**
+
+-   **multi.hist de la biblioteca psych:** se utiliza para visualizar multiples histogramas en una sola gráfica; crea un gráfico que contiene múltiples histogramas, respectivamente uno para cada variable en x. Esta función facilita la comparación de formas y eetección de posibles valores atípicos o sesgos, al visualizar la distribucción de varias variables simultáneamente.
+
+    -Entrada: recibe como entrada una matrix x o data frame con los datos, también como opcional puede recibir variables especificas para histograma (var), variable de x para agrupar histogramas (group).
+
+    -Salida: como salida se generá un gráfico con múltiples histogramas.
+
+-   **ggpairs de la biblioteca GGally:** Esta función permite visualizar la relación entre cada par de variables mediante diferentes métodos, como diagramas de densidad, correlogramas, etc. Para ello crea un gráfico de pares (matriz de gráficos) con los diferentes tipos de gráficos seleccionados para cada par de variables.
+
+    -Entrada: recibe como entrada un data frame con los datos (data), además de otras opciones para personalizar el gráfico.
+
+    -Salida: se genera como salida un gráfico de pares que contiene diferentes tipos de gráficos para cada par de variables.
+
+-   **la Función Step de la sección 3 del ejemplo 1:** es una función que se utilza para realizar la selección de variables paso a paso en modelos estadísticos. De modo que, encuentra el mejor subconjunto de variables que explique la variable dependiente, esto se hace utilizando un criterio de información como AIC o BIC.
+
+    -Entrada: recibe como entrada los siguientes elementos: object (modelo de regresión lineal), scope (alcance de la búsqueda), direction (dirección de busqueda, entre sus valores posibles están "backward", "forwad", "both") y como opcional (trace) está un valor booleano que indique si se debe mostrar o no la información sobre el proceso de selección de variables (trace).
+
+    -Salida: tiene como salida un nuuevo modelo de gresión lineal con el mejoir subconjunto de variables encontrado (object) y un resumen del proceso de selección de variables, mostrando los modelos con diferentes variables y el valor del cirterio de información para cada uno (summary.
+
+-   **Confint:** esta función calcula los intervalos de confianza para los coeficientes de un modelo de regresión lineal. A partir de esta función, es posible determinar el rango de valores dentro del cual se encuentra el verdadero coeficiente dado un nivel de confianza.
+
+    -Entrada: recibe como entrada un modelo de regresión lineal (model) y un nivel de confianza (level).
+
+    -Salida: genera intervalos de confianza para los coeficientes del modelo respectivo.
+
+-   **Corrplot de la biblioteca corrplot:** Esta función crea un gráfico de correlaciones con difernetes opciones para la visualziación. De modo que permite observar las correlaciones entre las variables un dataframe de forma más intuitiva y atractiva visualmente.
+
+    -Entrada: tiene como entrada distintos parámetros como: matriz de correlación (mat), método de cálculo de la correlación (method), tipo de gráfico escogido (type) y como opcional un título (title).
+
+    -Salida: genera como salida un gráfico de correlaciones con diferentes opciones de visualización dependiendo las necesidades.
+
+-   **Dwt de la biblioteca car:** funciona para realizar la transformada de wavelet discreta en una serie temporal. Esto con el fin de descomponer la serie en diferentes niveles de detalle, facilitando la identificación de patrones y tendencia en los datos.
+
+-Entrada: recibe como entrada un vector de datos (x), un tipo de wavelet (wavelet) y un nivel de descomposición (level).
+
+-Salida: genera como salida un objeto que tiene la transformada wavelet discreta de los datos.
+
+\-**InfluencePlot:** esta es otra función que crea gráficos. Especificamente, un gráfico que muestra la influencia de cada punto en un modelo de regresión lineal. De modo que se logre identificar posibles valores atípicos o puntos influyentes que pueden afectar significativamente los resultados del modelo.
+
+-Entrada: recibe como entrada un modelo de regresión lineal (model) y un tipo de gráfico (type).
+
+-Salida: como salida genera un gráfico que muestra la influencia de cada punto en el modelo.
+
+\-**outlierTest de la biblioteca car:** esta función está diseñada para detectar valores atípicos contenidos en un dataframe. Para ello se pueden utilizar diferentes métodos, como la distancia de Mahalanobis o el test de Grubbs.
+
+-Entrada: como entrada recibe un data frame con los datos (data( y un método para la deteción de los outliers (method(.
+
+-Salida: genera un rsumen de los resultados de la detección de los outliers.
+
+\-**influence.measure :** esta función calcula diferentes medidas de influencia para cada punto en el modelo de regresión lineal; esto permite cuantificar el impacto que cada punto tiene en los resultados del modelo.
+
+-Entrada: recibe como datios de entrada un modelo de regresión lineal (model) y un tipo de medida de influencia (type).
+
+-Salida: genera como salida un vector de las medidas de influencia para cada punto.
+
+**c). Explique los test incluyendo cual es la hipótesis nula.**
+
+\-**Shapiro-Wilk para normalidad:** Este test es una prueba de normalidad que se utiliza para determinar si una muestra de datos proviene de una población con una distribucción normal. Utiliza un estadístico de prueba W, que es calculado como la correlación entre la variable original y la ordenada de la distribucción normal estándar. Luego se calculo el valor p a partir de W y la distribuición de Shapiro-Wilk.
+
+La hipótesis nula de este test, es que los datos provienen de una población con una distribucción normal. Por otro lado, su hipótesis alternativa se base en que los datos no provienen de una población con una distribucción normal.
+
+El nivel de significancia, también conocido como alfa (α), es el máximo valor de p que se acepta para rechazar la hipótesis nula. Un valor p puede tomar cualquier valor entre 0 y 1.
+
+De modo que, si el valor p es menor que el nivel de significancia, se rechaza la hipótesis nula y se concluye que la muestra no se ajusta a una distribucción normal. Por otro lado, si el valor p es mayor que el nivel de significancia, no se rechaza la hipótesis nula y no se puede concluir que la muestra no se ajusta a una distribucción normal.
+
+Cabe destacar que esta prueba es sensible a la presencia de valores atípicos y al igual que en otros test de de normalidad, puede ser sensible al tamaño de la muestra.
+
+\-**Studentized Breusch-Pagan para homocedasticidad:** Es una prueba, que como su nombre lo indica, es utilizada para evaular la homocedasticidad de un modelo de regresión.
+
+Teniendo en cuenta que la homocedasticidad, se entiende como la suposición de que la varianza de los erros en un modelo de regresión es constante en todos los niveles de la variable independinete.
+
+En esta prueba se utiliza un estadístico de prueba, el cual es calculado como la suma de los cuadrados de los residuos ponderados por la inversa de la varianza estimada para cada observación.
+
+El valor p se calcula a partir del estadístico de prueba y una distribución chi-cuadrado con grados de libertad iguales al número de variables independientes en el modelo
+
+La hipótesis nula de este test, es que la varianza de los errores del modelo es homocedástica; es decir, que no depende del valor de variables independientes. Por otra parte, la hipótesis alternativa es que la varianza de los errores del modelo es heterocedástica; es decir, que si depende del valor de las variables independientes.
+
+De modo que, si el valor p es menor que el nivel de significancia, se rechaza la hipótesis nula y se concluye que la varianza de los errores no es homocedástica. Por otro lado, si el valor p es mayor que el nivel de significancia, no se rechaza la hipótesis nula y no se puede concluir que la varianza de los errores no sea homocedástica.
+
+Cabe destacar que esta prueba también es sencible a la presencia de valores atípicos, pero no se ve afectada por la normalidad de los errores.
+
+# **Parte 2**
+
+# **Parte 3**
