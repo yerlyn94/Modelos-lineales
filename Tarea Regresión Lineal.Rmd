@@ -1,9 +1,24 @@
 ---
 title: 'Tarea Regresión Lineal- Modelos Lineales y de Sobrevivencia'
-author: " Rachell Casanova B81697 \\ Liz Madriz B84555 \\ Yerlyn Quiros  B45528"
+author: " Rachell Casanova B81697
+          Liz Madriz B84555 
+          Yerlyn Quiros  B45528"
 date: "2024-04-05"
-output: html_document
+output: 
+    rmdformats::downcute:
+    default_style: "dark"
+    downcute_theme: "chaos"
+    code_folding: hide
+    toc_depth: 5
+    toc_float:
+      collapsed: FALSE
 ---
+
+```{r, echo=FALSE, results='asis'}
+cat('<style type="text/css">')
+cat(readLines('custom_font.css'), sep = '\n')
+cat('</style>')
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -600,6 +615,15 @@ X2 <- data.frame(cbind(Y,X[,-1]))
 ```
 
 **b. La función lm( ) estima la inversa de XtX con base en el proceso de descomposición QR, de Gram–Schmidt, realice una breve descripción de este proceso y verifique usando la función qr.solve () que los estimadores del resultado de la regresión lineal de punto a son los mismos.**
+
+Descripción:
+
+La descomposición QR se utiliza para descomponer una matriz A en Q y R, es decir, A = QR, donde Q es una matriz ortonormal y R es una matriz triangular superior. Esta técnica suele ser utlilizada para calcular valores propios y para resolver problemas con mínimos cuadrados lineales.
+
+Uno de los métodos que se utilizan para la descomposición QR, es la de Gram–Schmidt. Este método se usa para hallar bases ortogonales (Espacio Euclideo no normalizado) de cualquier base no euclídea.
+
+
+Usando la función:
 
 ```{r}
 XtX <- t(X) %*% X
