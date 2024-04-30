@@ -614,6 +614,14 @@ X = matrix(c(1, 124.17,134.07,23.32,210.11, 1,149.46,142.21,41.82,229.67,
 X2 <- data.frame(cbind(Y,X[,-1])) 
 ```
 
+**a.Estime un modelo de regresión lineal, con la función lm() para la variable X2.**
+
+```{r}
+#Estimar el modelo de regresión lineal
+modelo <- lm(Y ~ ., data = X2)
+```
+
+
 **b. La función lm( ) estima la inversa de XtX con base en el proceso de descomposición QR, de Gram–Schmidt, realice una breve descripción de este proceso y verifique usando la función qr.solve () que los estimadores del resultado de la regresión lineal de punto a son los mismos.**
 
 Descripción:
@@ -631,3 +639,88 @@ XtY <- t(X) %*% Y
 
 qr.solve(XtX, XtY)
 ```
+
+**c.Usando una matriz pseudo-inversa (Moonre-Penrose) y según lo visto en clases, reconstruya los valores de la regresión del punto a.**
+i.Estimadores
+```{r}
+# Calcular la pseudo-inversa de Moore-Penrose de X
+X_pseudo <- solve(t(X) %*% X) %*% t(X)
+
+#Calcular los estimadores (coeficientes)
+beta_hat <- X_pseudo %*% Y
+```
+
+ii.Std. Error de los estimadores
+```{r}
+# Calcular la matriz de varianza-covarianza de los estimadores
+V_beta <- sigma^2 * solve(t(X) %*% X)
+
+# ii.Calcular el error estándar de los estimadores
+std_error <- sqrt(diag(V_beta))
+```
+
+iii.T-value
+```{r}
+# iii.Calcular los t-values
+t_values <- beta_hat / std_error
+```
+
+iv.Pr(>|t|)
+```{r}
+#iv. Calcular los p-values
+p_values <- 2 * pt(-abs(t_values), df=nrow(X) - ncol(X))
+```
+
+v.Residual estándar error.
+```{r}
+# Calcular los residuos
+residuals <- Y - X %*% beta_hat
+
+# v. Calcular el error estándar residual
+sigma <- sqrt(sum(residuals^2) / (nrow(X) - ncol(X)))
+```
+
+vi.R cuadrado
+```{r}
+#vi. Calcular R cuadrado
+SSR <- sum((X %*% beta_hat - mean(Y))^2)
+SST <- sum((Y - mean(Y))^2)
+R2 <- SSR / SST
+```
+
+vii.R cuadrado Ajustado
+```{r}
+#vii. Calcular R cuadrado ajustado
+R2_adj <- 1 - (1 - R2) * (nrow(X) - 1) / (nrow(X) - ncol(X))
+```
+
+viii.F-estadistico y su p-value.
+```{r}
+#Calcular el F-estadístico
+F_stat <- (SSR / (ncol(X) - 1)) / (sum(residuals^2) / (nrow(X) - ncol(X)))
+
+# Calcular el p-value del F-estadístico
+p_value_F <- pf(F_stat, ncol(X) - 1, nrow(X) - ncol(X))
+
+```
+
+**d.Realice una prueba de contraste para determinar si se acepta o no la hipótesis que Tasa Flujo Gas 2 + aperturaBoq = 0.**
+```{r}
+# Crear el vector de contraste L
+L <- matrix(0, nrow = length(beta_hat), ncol = 1)
+L[indice_tasaFlujoGas2] <- 1
+L[indice_aperturaBoq] <- 1
+
+# Calcular el estadístico t
+t_stat <- (t(L) %*% beta_hat) / sqrt(t(L) %*% V_beta %*% L)
+
+# Calcular el p-value
+p_value <- 2 * pt(-abs(t_stat), df = nrow(X) - ncol(X))
+
+# Mostrar el t-stat y p-value
+print(t_stat)
+print(p_value)
+```
+
+Comentarios:
+Con un p-valor tan alto (0.8934968), no hay suficiente evidencia estadística para rechazar la hipótesis nula. Esto significa que, basado en los datos y el modelo de regresión utilizado, no se puede afirmar que la suma de los coeficientes de 'tasaFlujoGas2' y 'aperturaBoq' sea diferente de cero.
