@@ -650,6 +650,15 @@ X_pseudo <- solve(t(X) %*% X) %*% t(X)
 beta_hat <- X_pseudo %*% Y
 ```
 
+v.Residual estándar error.
+```{r}
+# Calcular los residuos
+residuals <- Y - X %*% beta_hat
+
+# v. Calcular el error estándar residual
+sigma <- sqrt(sum(residuals^2) / (nrow(X) - ncol(X)))
+```
+
 ii.Std. Error de los estimadores
 ```{r}
 # Calcular la matriz de varianza-covarianza de los estimadores
@@ -658,7 +667,6 @@ V_beta <- sigma^2 * solve(t(X) %*% X)
 # ii.Calcular el error estándar de los estimadores
 std_error <- sqrt(diag(V_beta))
 ```
-
 iii.T-value
 ```{r}
 # iii.Calcular los t-values
@@ -669,15 +677,6 @@ iv.Pr(>|t|)
 ```{r}
 #iv. Calcular los p-values
 p_values <- 2 * pt(-abs(t_values), df=nrow(X) - ncol(X))
-```
-
-v.Residual estándar error.
-```{r}
-# Calcular los residuos
-residuals <- Y - X %*% beta_hat
-
-# v. Calcular el error estándar residual
-sigma <- sqrt(sum(residuals^2) / (nrow(X) - ncol(X)))
 ```
 
 vi.R cuadrado
@@ -706,6 +705,10 @@ p_value_F <- pf(F_stat, ncol(X) - 1, nrow(X) - ncol(X))
 
 **d.Realice una prueba de contraste para determinar si se acepta o no la hipótesis que Tasa Flujo Gas 2 + aperturaBoq = 0.**
 ```{r}
+# Identificar los índices para tasaFlujoGas2 y aperturaBoq
+indice_tasaFlujoGas2 <- which(names == "tasaFlujoGas2")
+indice_aperturaBoq <- which(names == "aperturaBoq")
+
 # Crear el vector de contraste L
 L <- matrix(0, nrow = length(beta_hat), ncol = 1)
 L[indice_tasaFlujoGas2] <- 1
